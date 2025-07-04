@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NetSentinel - Packet Classifier</title>
+</head>
+<body>
+  <h2>🛡️ NetSentinel - Packet Classifier</h2>
+  <label for="size">Enter Packet Size (bytes):</label>
+  <input type="number" id="size" />
+  <button onclick="sendPacket()">Predict</button>
+  <p id="result"></p>
+
+  <script>
+    async function sendPacket() {
+      const size = document.getElementById("size").value;
+      const res = await fetch("/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packet_size: parseInt(size) })
+      });
+
+      const data = await res.json();
+      console.log(data);  // Geri dönen cevabı konsola yaz
+
+      if (data.prediction && data.confidence !== undefined) {
+        document.getElementById("result").innerText =
+          `Prediction: ${data.prediction} (${data.confidence}% confidence)`;
+      } else {
+        document.getElementById("result").innerText = `Error: ${data.error}`;
+      }
+    }
+  </script>
+</body>
+</html>

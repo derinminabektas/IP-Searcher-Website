@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title> Anomalyze - Intelligent Anomaly Analyzer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      margin: 0;
+      background-color: white;
+      color: black;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .dark-mode {
+      background-color: #121212;
+      color: #eee;
+    }
+
+    #container {
+      width: 100%;
+      max-width: 600px;
+      text-align: center;
+    }
+
+    #toggle-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+    }
+
+    h2 {
+      margin-bottom: 30px;
+    }
+
+    label, input, button {
+      margin: 5px;
+    }
+
+    #prediction {
+      margin: 20px auto;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: bold;
+      width: fit-content;
+    }
+
+    .normal {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .anomalous {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    #history {
+      margin-top: 30px;
+      text-align: left;
+    }
+
+    #history h3 {
+      margin-bottom: 10px;
+    }
+
+    #history ul {
+      list-style-type: none;
+      padding-left: 0;
+    }
+
+    #history li {
+      background: #f1f1f1;
+      margin-bottom: 5px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: #000;
+      transition: all 0.3s ease;
+    }
+
+    .dark-mode #history li {
+      background: #1e1e1e;
+      color: #e0e0e0;
+      border: 1px solid #333;
+    }
+  </style>
+</head>
+<body>
+  <button id="toggle-btn">🌙 Dark Mode</button>
+
+  <div id="container">
+    <h2>🛡️ Anomalyze - Intelligent Anomaly Analyzer</h2>
+    <label for="size">Enter Packet Size (bytes):</label>
+    <input type="number" id="size" />
+    <button onclick="sendPacket()">Predict</button>
+
+    <div id="prediction" class=""></div>
+
+    <div id="history">
+      <h3>🕵️ Prediction History</h3>
+      <ul id="history-list"></ul>
+    </div>
+  </div>
+
+  <script>
+    const historyList = [];
+
+    async function sendPacket() {
+      const size = document.getElementById("size").value;
+      const res = await fetch("/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packet_size: parseInt(size) })
+      });
+
+      const data = await res.json();
+      const resultDiv = document.getElementById("prediction");
+
+      if (data.prediction && data.confidence !== undefined) {
+        const msg = `⚠️ Prediction: ${data.prediction} (${data.confidence}% confidence)`;
+        resultDiv.textContent = msg;
+        resultDiv.className = data.prediction === "Normal" ? "normal" : "anomalous";
+
+        // Geçmişe ekle
+        historyList.unshift(`${size} bytes — ${data.prediction} (${data.confidence}% confidence)`);
+        renderHistory();
+      } else {
+        resultDiv.textContent = `Error: ${data.error}`;
+        resultDiv.className = "";
+      }
+    }
+
+    function renderHistory() {
+      const ul = document.getElementById("history-list");
+      ul.innerHTML = "";
+      historyList.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        ul.appendChild(li);
+      });
+    }
+
+    // Dark mode toggle
+    document.getElementById("toggle-btn").addEventListener("click", () => {
+      document.body.classList.toggle("dark-mode");
+    });
+  </script>
+</body>
+</html>
