@@ -1,6 +1,8 @@
+
 from flask import Flask, jsonify, render_template
 import pandas as pd
 import csv
+
 
 app = Flask(__name__)
 
@@ -56,7 +58,6 @@ def reset_data():
         return jsonify({"success": True, "message": "Live traffic data reset successfully!"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 
 if __name__ == "__main__":

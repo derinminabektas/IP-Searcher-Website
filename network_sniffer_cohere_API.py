@@ -1,3 +1,4 @@
+
 """
 NetSentinel + Cohere integration (rate limit aware)
 - Local statistical labelling
@@ -9,7 +10,9 @@ import os
 import statistics
 import time
 from collections import defaultdict
+
 from datetime import datetime, timedelta
+
 
 import matplotlib
 import pandas as pd
@@ -24,6 +27,7 @@ import matplotlib.pyplot as plt
 load_dotenv()
 import cohere
 
+
 api_key = os.getenv("COHERE_API_KEY")
 if not api_key:
     print("⚠️  COHERE_API_KEY bulunamadı! .env dosyası oluşturun ve API anahtarınızı ekleyin.")
@@ -33,11 +37,13 @@ else:
     co = cohere.Client(api_key)
 
 
+
 def cohere_assess_packet(size: int) -> str:
     """
     Cohere API'sinden paketin anormal olup olmadığını öğren.
     Yanıt sadece '0' veya '1' olmalı, gerekiyorsa temizle.
     """
+
     if co is None:
         return "Cohere-err:NoAPIKey"
     
@@ -96,6 +102,7 @@ class NetSentinel:
         self.lower = None
         self.upper = None
         self.last_api_reset = None  # İlk API çağrısında set edilecek
+
         self.api_call_count = 0
 
     def _sampler(self, pkt):
@@ -103,6 +110,7 @@ class NetSentinel:
             self.sizes.append(len(pkt))
 
     def calc_stats(self):
+
         sniff(filter="tcp or udp", prn=self._sampler, store=0, count=50)
         mean = statistics.mean(self.sizes)
         
@@ -144,6 +152,7 @@ class NetSentinel:
         else:
             protocol = "Other"
             sp = dp = "N/A"
+
         size = len(pkt)
         local = self._local_label(size)
 
@@ -153,6 +162,7 @@ class NetSentinel:
         if len(self.ip_times[src]) > self.p_thr and src not in self.alerted:
             print(f"⚠️  {src} exceeded {self.p_thr} pkts in {self.t_thr}s")
             self.alerted.add(src)
+
 
         # Rate limit kontrolü (API çağrısından önce)
         if self.api_call_count >= 10 and self.last_api_reset is not None:
@@ -187,6 +197,7 @@ class NetSentinel:
         with open(self.log, "a", newline="") as f:
             csv.writer(f).writerow(
                 [ts, src, dst, sp, dp, protocol, size, local, ai]
+
             )
 
     def analyse(self):
@@ -228,6 +239,8 @@ class NetSentinel:
         print("🟢 Listening… Ctrl+C to stop.")
         try:
             sniff(filter="tcp or udp", prn=self._handle, store=0)
+
+
         except KeyboardInterrupt:
             print("\n⛔ Stopped. Packets:", self.p_count)
 
