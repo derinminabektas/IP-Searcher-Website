@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title> Anomalyze - Intelligent Anomaly Analyzer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      margin: 0;
+      background-color: white;
+      color: black;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .dark-mode {
+      background-color: #121212;
+      color: #eee;
+    }
+
+    #container {
+      width: 100%;
+      max-width: 600px;
+      text-align: center;
+    }
+
+    #toggle-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+    }
+
+    h2 {
+      margin-bottom: 30px;
+    }
+
+    button {
+      margin: 5px;
+    }
+
+    .normal {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .anomalous {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    #history {
+      margin-top: 30px;
+      text-align: left;
+    }
+
+    #history h3 {
+      margin-bottom: 10px;
+    }
+
+    #history ul {
+      list-style-type: none;
+      padding-left: 0;
+    }
+
+    #history li {
+      background: #f1f1f1;
+      margin-bottom: 5px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: #000;
+      transition: all 0.3s ease;
+    }
+
+    .dark-mode #history li {
+      background: #1e1e1e;
+      color: #e0e0e0;
+      border: 1px solid #333;
+    }
+  </style>
+</head>
+<body>
+  <div id="timezone-select-container" style="position: absolute; top: 20px; left: 20px; z-index: 1000; background: #fff; padding: 6px 12px; border-radius: 6px; box-shadow: 0 2px 8px #0001;">
+    <label for="timezone-select"><strong>🕒 Saat Dilimi:</strong></label>
+    <select id="timezone-select" style="padding: 6px; border-radius: 4px;">
+      <option value="Europe/Istanbul">Türkiye (GMT+3, Europe/Istanbul)</option>
+      <option value="Europe/London">Londra (GMT+0/BST, Europe/London)</option>
+      <option value="Europe/Berlin">Berlin (GMT+1/CEST, Europe/Berlin)</option>
+      <option value="America/New_York">New York (GMT-5/EST, America/New_York)</option>
+      <option value="Asia/Tokyo">Tokyo (GMT+9, Asia/Tokyo)</option>
+    </select>
+  </div>
+  <button id="toggle-btn">🌙 Dark Mode</button>
+
+  <div id="container">
+    <h2>🛡️ HDB Labs - Live Traffic Monitor</h2>
+
+    <div id="live-data">
+      <h3>📊 Live Traffic Data</h3>
+      <div id="stats"></div>
+      
+      <div style="margin: 20px 0;">
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+          <input type="text" id="search-input" placeholder="🔍 Paket boyutu ara..." style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+          <select id="filter-label" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <option value="all">Tümü</option>
+            <option value="Normal">Sadece Normal</option>
+            <option value="Anomalous">Sadece Anomalous</option>
+          </select>
+          <select id="filter-protocol" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <option value="all">Tüm Protokoller</option>
+            <option value="TCP">TCP</option>
+            <option value="UDP">UDP</option>
+            <option value="ICMP">ICMP</option>
+            <option value="HTTP">HTTP</option>
+            <option value="HTTPS">HTTPS</option>
+            <option value="DNS">DNS</option>
+          </select>
+          <button onclick="clearFilters()" style="padding: 8px 12px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">Temizle</button>
+          <button onclick="manualUpdate()" style="padding: 8px 12px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">🔄 Güncelle</button>
+          <button id="auto-update-btn" onclick="toggleAutoUpdate()" style="padding: 8px 12px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">⏸️ Otomatik Kapat</button>
+          <button onclick="resetData()" style="padding: 8px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">🗑️ Sıfırla</button>
+        </div>
+      </div>
+      
+      <div id="recent-packets"></div>
+    </div>
+  </div>
+
+  <script>
+    // Her sayfa açılışında varsayılanı Türkiye saati olarak ayarla
+    localStorage.setItem('selectedTimezone', 'Europe/Istanbul');
+
+    // Gerçek zamanlı veri güncelleme
+    let currentPacketCount = 0;
+    
+    async function updateLiveData() {
+      try {
+        const res = await fetch("/data");
+        const data = await res.json();
+        
+        if (data.error) {
+          document.getElementById("stats").innerHTML = `<p>Error: ${data.error}</p>`;
+          return;
+        }
+        
+        // İstatistikleri güncelle
+        const stats = data.stats;
+        document.getElementById("stats").innerHTML = `
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
+            <div style="background: #e3f2fd; padding: 10px; border-radius: 8px;">
+              <strong>Total:</strong> ${stats.total_packets}
+            </div>
+            <div style="background: #e8f5e8; padding: 10px; border-radius: 8px;">
+              <strong>Normal:</strong> ${stats.normal_count}
+            </div>
+            <div style="background: #ffebee; padding: 10px; border-radius: 8px;">
+              <strong>Anomalous:</strong> ${stats.anomalous_count}
+            </div>
+          </div>
+          <div style="background: #f5f5f5; padding: 10px; border-radius: 8px;">
+            <strong>Mean:</strong> ${stats.mean_size.toFixed(2)} bytes | 
+            <strong>Std:</strong> ${stats.std_size.toFixed(2)} bytes
+          </div>
+        `;
+        
+        // Sadece yeni paketleri ekle (scroll pozisyonunu koru)
+        const allPackets = data.recent_data.reverse();
+        const packetsContainer = document.getElementById("recent-packets");
+        
+        // İlk yükleme veya paket sayısı değiştiyse
+        if (currentPacketCount === 0 || allPackets.length !== currentPacketCount) {
+          const wasAtBottom = packetsContainer.scrollTop + packetsContainer.clientHeight >= packetsContainer.scrollHeight - 10;
+          
+          let packetsHtml = `
+            <div style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 10px;">
+              <div style="margin-bottom: 10px; font-weight: bold; color: #666;">
+                📊 Toplam ${allPackets.length} paket gösteriliyor
+              </div>
+              <div style="display: flex; font-weight: bold; background: #f0f0f0; padding: 6px; border-radius: 4px; font-size: 12px; margin-bottom: 6px;">
+                <div style="width: 40px;">#</div>
+                <div style="width: 120px;">Timestamp</div>
+                <div style="width: 140px;">IP Source</div>
+                <div style="width: 70px;">Src Port</div>
+                <div style="width: 140px;">IP Destination</div>
+                <div style="width: 70px;">Dst Port</div>
+                <div style="width: 70px;">Protocol</div>
+                <div style="width: 80px;">Pkt Size</div>
+                <div style="width: 80px;">Label</div>
+              </div>
+          `;
+          allPackets.forEach((packet, index) => {
+            const labelClass = packet["Local Label"] === "Normal" ? "normal" : "anomalous";
+            packetsHtml += `
+              <div class="${labelClass} packet-item" 
+                   style="margin: 3px 0; padding: 6px; border-radius: 4px; font-size: 12px; display: flex; align-items: center;"
+                   data-size="${packet["Packet Size"]}"
+                   data-label="${packet["Local Label"]}">
+                <div style="width: 40px;">${allPackets.length - index}</div>
+                <div class="packet-timestamp" data-utc="${packet["Timestamp"]}" style="width: 120px;">${formatTime(packet["Timestamp"])}</div>
+                <div style="width: 140px;">${packet["IP Source"]}</div>
+                <div style="width: 70px;">${packet["Source Port"] ? packet["Source Port"] : 'N/A'}</div>
+                <div style="width: 140px;">${packet["IP Destination"]}</div>
+                <div style="width: 70px;">${packet["Destination Port"] ? packet["Destination Port"] : 'N/A'}</div>
+                <div style="width: 70px; color: #1976d2; font-weight: bold;">${packet["Protocol"]}</div>
+                <div style="width: 80px;">${packet["Packet Size"]}</div>
+                <div style="width: 80px; font-weight: bold;">${packet["Local Label"]}</div>
+              </div>
+            `;
+          });
+          packetsHtml += '</div>';
+          packetsContainer.innerHTML = packetsHtml;
+          
+          // Eğer kullanıcı en alttaysa, yeni paketlerle birlikte aşağıda kal
+          if (wasAtBottom) {
+            packetsContainer.scrollTop = packetsContainer.scrollHeight;
+          }
+          
+          currentPacketCount = allPackets.length;
+        }
+        
+      } catch (error) {
+        console.error("Error updating live data:", error);
+      }
+    }
+    
+    // Filtreleme fonksiyonları
+    function filterPackets() {
+      const searchTerm = document.getElementById("search-input").value.toLowerCase();
+      const filterLabel = document.getElementById("filter-label").value;
+      const filterProtocol = document.getElementById("filter-protocol").value;
+      const packetElements = document.querySelectorAll("#recent-packets .packet-item");
+      
+      packetElements.forEach(element => {
+        const packetText = element.textContent.toLowerCase();
+        const packetSize = element.getAttribute("data-size");
+        const packetLabel = element.getAttribute("data-label");
+        // Yeni: port ve protokol bilgilerini al
+        const protocol = element.querySelector('div:nth-child(7)').textContent.trim();
+        const srcPort = element.querySelector('div:nth-child(4)').textContent.trim();
+        const dstPort = element.querySelector('div:nth-child(6)').textContent.trim();
+        
+        let show = true;
+        
+        // Arama filtresi
+        if (searchTerm && !packetText.includes(searchTerm)) {
+          show = false;
+        }
+        
+        // Label filtresi
+        if (filterLabel !== "all" && packetLabel !== filterLabel) {
+          show = false;
+        }
+        
+        // Protokol filtresi
+        if (filterProtocol === "HTTP") {
+          // Sadece TCP ve port 80
+          if (!(protocol === "TCP" && (srcPort === "80" || dstPort === "80"))) {
+            show = false;
+          }
+        } else if (filterProtocol === "HTTPS") {
+          // Sadece TCP ve port 443
+          if (!(protocol === "TCP" && (srcPort === "443" || dstPort === "443"))) {
+            show = false;
+          }
+        } else if (filterProtocol === "DNS") {
+          // Sadece UDP ve port 53
+          if (!(protocol === "UDP" && (srcPort === "53" || dstPort === "53"))) {
+            show = false;
+          }
+        } else if (filterProtocol !== "all" && filterProtocol !== "HTTP" && filterProtocol !== "HTTPS" && filterProtocol !== "DNS") {
+          if (protocol !== filterProtocol) {
+            show = false;
+          }
+        }
+        
+        element.style.display = show ? "flex" : "none"; // Use flex for header
+      });
+    }
+    
+    function clearFilters() {
+      document.getElementById("search-input").value = "";
+      document.getElementById("filter-label").value = "all";
+      document.getElementById("filter-protocol").value = "all";
+      filterPackets();
+    }
+    
+    // Event listeners
+    document.getElementById("search-input").addEventListener("input", filterPackets);
+    document.getElementById("filter-label").addEventListener("change", filterPackets);
+    document.getElementById("filter-protocol").addEventListener("change", filterPackets);
+    
+    // Otomatik güncelleme kontrolü
+    let autoUpdateInterval = null;
+    let autoUpdateEnabled = true;
+    
+    function startAutoUpdate() {
+      if (!autoUpdateInterval) {
+        autoUpdateInterval = setInterval(updateLiveData, 10000);
+        autoUpdateEnabled = true;
+      }
+    }
+    
+    function stopAutoUpdate() {
+      if (autoUpdateInterval) {
+        clearInterval(autoUpdateInterval);
+        autoUpdateInterval = null;
+        autoUpdateEnabled = false;
+      }
+    }
+    
+    function toggleAutoUpdate() {
+      if (autoUpdateEnabled) {
+        stopAutoUpdate();
+        document.getElementById("auto-update-btn").textContent = "▶️ Otomatik Aç";
+        document.getElementById("auto-update-btn").style.background = "#ff9800";
+      } else {
+        startAutoUpdate();
+        document.getElementById("auto-update-btn").textContent = "⏸️ Otomatik Kapat";
+        document.getElementById("auto-update-btn").style.background = "#4CAF50";
+      }
+    }
+    
+    // Manuel güncelleme butonu
+    function manualUpdate() {
+      updateLiveData();
+    }
+    
+    // Veri sıfırlama fonksiyonu
+    async function resetData() {
+      if (confirm("⚠️ Tüm live traffic verilerini sıfırlamak istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!")) {
+        try {
+          const res = await fetch("/reset", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+          });
+          
+          const data = await res.json();
+          
+          if (data.success) {
+            alert("✅ Live traffic verileri başarıyla sıfırlandı!");
+            // Sayfayı yenile
+            location.reload();
+          } else {
+            alert("❌ Hata: " + data.error);
+          }
+        } catch (error) {
+          alert("❌ Bağlantı hatası: " + error);
+        }
+      }
+    }
+    
+    // Başlangıçta otomatik güncellemeyi başlat
+    startAutoUpdate();
+    updateLiveData(); // İlk yükleme
+    
+    // Dark mode toggle
+    document.getElementById("toggle-btn").addEventListener("click", () => {
+      document.body.classList.toggle("dark-mode");
+    });
+
+    // Saat dilimi seçimi ve zaman formatlama
+    function getSelectedTimezone() {
+      // Eğer localStorage'da yoksa, varsayılan olarak Türkiye saat dilimi (Europe/Istanbul) döndür
+      return localStorage.getItem('selectedTimezone') || 'Europe/Istanbul';
+    }
+    function setSelectedTimezone(tz) {
+      localStorage.setItem('selectedTimezone', tz);
+    }
+    document.getElementById('timezone-select').value = getSelectedTimezone();
+    document.getElementById('timezone-select').addEventListener('change', function() {
+      setSelectedTimezone(this.value);
+      reformatAllTimes();
+    });
+
+    function reformatAllTimes() {
+      // Tüm zaman hücrelerini bul ve yeniden formatla
+      document.querySelectorAll('.packet-item .packet-timestamp').forEach(el => {
+        el.textContent = formatTime(el.dataset.utc);
+      });
+    }
+    function formatTime(utcString) {
+      // utcString: 'YYYY-MM-DD HH:mm:ss' (UTC)
+      const tz = getSelectedTimezone();
+      // ISO format için 'T' ekle
+      const iso = utcString.replace(' ', 'T') + 'Z';
+      let d = new Date(iso);
+      try {
+        if (tz !== 'UTC') {
+          // Intl API ile saat dilimine göre göster
+          return d.toLocaleString('tr-TR', { timeZone: tz });
+        } else {
+          return d.toLocaleString('tr-TR', { timeZone: 'UTC' }) + ' (UTC)';
+        }
+      } catch {
+        return utcString;
+      }
+    }
+  </script>
+</body>
+</html>
