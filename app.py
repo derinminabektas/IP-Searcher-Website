@@ -2,7 +2,6 @@ from flask import Flask, jsonify, render_template
 import pandas as pd
 import csv
 
-
 app = Flask(__name__)
 
 @app.route("/")
