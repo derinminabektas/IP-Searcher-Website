@@ -1,4 +1,3 @@
-
 from flask import Flask, jsonify, render_template
 import pandas as pd
 import csv
@@ -29,10 +28,31 @@ def get_data():
             "mean_size": df["Packet Size"].mean(),
             "std_size": df["Packet Size"].std()
         }
+
+        # Aynı API'den 2 veya daha fazla istek kontrolü
+        # API anahtarı: (IP Source, IP Destination, Source Port, Destination Port, Protocol)
+        api_counts = {}
+        api_rows = {}
+        for idx, row in df.iterrows():
+            key = (row["IP Source"], row["IP Destination"], row["Source Port"], row["Destination Port"], row["Protocol"])
+            if key not in api_counts:
+                api_counts[key] = 0
+                api_rows[key] = []
+            api_counts[key] += 1
+            # Sıra numarası: en üst satır 1, en alt satır N olacak şekilde
+            api_rows[key].append(len(df) - idx)
+        duplicate_apis = []
+        for key, count in api_counts.items():
+            if count >= 2:
+                duplicate_apis.append({
+                    "api": key,
+                    "rows": api_rows[key]
+                })
         
         return jsonify({
             "recent_data": recent_data,
-            "stats": stats
+            "stats": stats,
+            "duplicate_apis": duplicate_apis
         })
     except Exception as e:
         return jsonify({"error": str(e)})
