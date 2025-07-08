@@ -94,6 +94,7 @@
     </select>
   </div>
   <button id="toggle-btn">🌙 Dark Mode</button>
+  <div id="duplicate-api-warning" style="position:absolute;top:60px;right:20px;max-width:260px;min-width:180px;z-index:2000;display:none;"></div>
 
   <div id="container">
     <h2>🛡️ HDB Labs - Live Traffic Monitor</h2>
@@ -145,6 +146,24 @@
         if (data.error) {
           document.getElementById("stats").innerHTML = `<p>Error: ${data.error}</p>`;
           return;
+        }
+        
+        // UYARI ALANI: Aynı API'den 2+ istek varsa göster
+        const warningDiv = document.getElementById("duplicate-api-warning");
+        if (data.duplicate_apis && data.duplicate_apis.length > 0) {
+          let html = '<div style="background:#fff3cd;color:#856404;border:1px solid #ffeeba;padding:8px 10px;border-radius:7px;margin-bottom:8px;font-size:13px;box-shadow:0 2px 8px #0001;">';
+          html += '<b style="font-size:14px;">⚠️ Aynı IP Source\'dan birden fazla istek geldi!</b>';
+          data.duplicate_apis.forEach(item => {
+            const rows = item.rows;
+            const ipSource = item.api[0];
+            html += `<div style='margin-top:6px;'>Satır(lar): <b>${rows.join(", ")}</b> → <span style='font-family:monospace;'>${ipSource}</span></div>`;
+          });
+          html += '</div>';
+          warningDiv.innerHTML = html;
+          warningDiv.style.display = '';
+        } else {
+          warningDiv.innerHTML = '';
+          warningDiv.style.display = 'none';
         }
         
         // İstatistikleri güncelle
